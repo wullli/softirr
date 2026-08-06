@@ -1,4 +1,4 @@
-# Measuring Consensus in Unstructured Biomedical Text-Annotations
+# Consensus Measures for Unstructured Biomedical Text Annotations
 
 [![Tests](https://github.com/wullli/softirr/actions/workflows/tests.yml/badge.svg)](https://github.com/wullli/softirr/actions/workflows/tests.yml)
 [![codecov](https://codecov.io/gh/wullli/softirr/branch/main/graph/badge.svg)](https://codecov.io/gh/wullli/softirr)
