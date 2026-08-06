@@ -22,7 +22,7 @@ dependencies = [
     "tenacity",
     "transformers",
 	"torch==2.6.*",
-    "nltk",
+    "nltk==3.10.*",
     "pydantic",
     "scikit-learn",
     "meddra-graph @ file:./external/meddra_graph",
