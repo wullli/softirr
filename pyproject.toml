@@ -60,6 +60,7 @@ extend-exclude = ["external"]
 
 [tool.ruff.lint]
 select = ["E", "F"]
+ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 # silence_hf_logging() must run before transformers is imported, so these imports cannot move.
