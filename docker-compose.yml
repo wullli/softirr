@@ -1,0 +1,197 @@
+# Each service runs one synthetic_irr.py experiment to completion and exits (they're batch
+# jobs, not daemons). Run them one at a time, or a few at once if you have GPU headroom:
+#   docker compose run --rm mesh-single
+#   docker compose run --rm mesh-sibling-set
+# `docker compose up` would start all of them concurrently and contend for the 2 GPUs below.
+#
+# --mode single and --mode set are split into separate services (rather than one --mode both
+# service) because set mode's bipartite measures are far more expensive than single mode's,
+# so bundling them into one job would make set mode's runtime block single mode's results (and
+# starve the scheduler of a GPU it could otherwise hand to another job) instead of letting the
+# two run as independently schedulable units.
+#
+# Requires the NVIDIA Container Toolkit on the host (nvidia-ctk) for GPU access.
+# Override sample/population counts per run, e.g.:
+#   docker compose run --rm mesh --n-samples 500 --n-populations 20
+#
+# ./src is bind-mounted over the image's copy, so it's `pip install -e .`'d at build time
+# and picks up local edits live -- no rebuild needed between runs. That does NOT cover the
+# meddra_graph dependency (external/meddra_graph is a non-editable `file:` install baked
+# into site-packages at build time) or pyproject.toml changes -- rebuild with
+# `docker compose build` for those.
+#
+# GPU selection: every container gets both host GPUs' device nodes mounted (count: all)
+# so that CUDA_VISIBLE_DEVICES, listed below with no value, gets passed through from the
+# shell that invokes `docker compose run` straight into the container (Compose's syntax for
+# "read this var from my own environment"). That lets an external scheduler like gflow
+# (scripts/run_synthetic_experiments.sh) pick a free host GPU and have the container respect
+# it, the same way it would for a bare-metal process. Set it yourself for manual runs, e.g.:
+#   CUDA_VISIBLE_DEVICES=1 docker compose run --rm icd11
+
+x-common: &common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: soft-irr:latest
+  env_file:
+    - .env
+  environment:
+    - CUDA_VISIBLE_DEVICES
+  volumes:
+    - ./src:/app/src
+    - ./data:/app/data
+    - ./results:/app/results
+    - hf-cache:/app/.cache/huggingface
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+# Ae's Monte Carlo estimate averages over max(--mc-min-shuffles, ceil(target/n_samples))
+# permutations, then keeps --mc-target-samples pairs per Ae term. Set mode runs 2 shuffles of
+# 200 samples, single mode 3 of 300 -- set mode's chance term is most of its runtime. The floor
+# only bites when target <= floor * n_samples, which is why set mode moves both.
+services:
+  mesh-single:
+    <<: *common
+    command: ["--dataset", "mesh", "--mode", "single", "--include-llm", "--mc-min-shuffles", "3"]
+
+  mesh-set:
+    <<: *common
+    command: ["--dataset", "mesh", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
+
+  icd11-single:
+    <<: *common
+    command: ["--dataset", "icd11", "--mode", "single", "--include-llm", "--mc-min-shuffles", "3"]
+
+  icd11-set:
+    <<: *common
+    command: ["--dataset", "icd11", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
+
+  meddra-single:
+    <<: *common
+    command: ["--dataset", "meddra", "--mode", "single", "--include-llm", "--mc-min-shuffles", "3"]
+
+  meddra-set:
+    <<: *common
+    command: ["--dataset", "meddra", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
+
+  # Negative-pair ablations, ICD-11 only. No 'children' service: ICD-11's pool is single-depth,
+  # so that mode always draws from an empty pool.
+  icd11-sibling-single:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "sibling", "--mode", "single", "--include-llm", "--mc-min-shuffles", "3"]
+
+  icd11-sibling-set:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "sibling", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
+
+  icd11-lexical-single:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "lexical", "--mode", "single", "--include-llm", "--mc-min-shuffles", "3"]
+
+  icd11-lexical-set:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "lexical", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
+
+  icd11-parent-single:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "parent", "--mode", "single", "--include-llm", "--mc-min-shuffles", "3"]
+
+  icd11-parent-set:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "parent", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
+
+  # Ablation arms, ICD-11 single mode only (set mode is too expensive for extra arms). Each writes
+  # its own suffixed files. chance-edit computes the chance term with an edit distance while the
+  # measure under test still scores the observed agreement.
+  icd11-chance-edit-single:
+    <<: *common
+    command: ["--dataset", "icd11", "--mode", "single", "--include-llm",
+              "--chance-measure", "levenshtein_bipartite"]
+
+  icd11-reasoning-single:
+    <<: *common
+    command: ["--dataset", "icd11", "--mode", "single", "--include-llm", "--enable-reasoning"]
+
+  # Draft services: same experiments with --draft (chance term Monte Carlo estimated with the
+  # measure under test, minutes instead of hours), 3 populations of 30 samples each, writing to
+  # *_draft files. Submitted by scripts/run_synthetic_draft_experiments.sh.
+  mesh-single-draft:
+    <<: *common
+    command: ["--dataset", "mesh", "--mode", "single", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  mesh-set-draft:
+    <<: *common
+    command: ["--dataset", "mesh", "--mode", "set", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  icd11-single-draft:
+    <<: *common
+    command: ["--dataset", "icd11", "--mode", "single", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  icd11-set-draft:
+    <<: *common
+    command: ["--dataset", "icd11", "--mode", "set", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  meddra-single-draft:
+    <<: *common
+    command: ["--dataset", "meddra", "--mode", "single", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  meddra-set-draft:
+    <<: *common
+    command: ["--dataset", "meddra", "--mode", "set", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  icd11-sibling-single-draft:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "sibling", "--mode", "single", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  icd11-sibling-set-draft:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "sibling", "--mode", "set", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  icd11-lexical-single-draft:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "lexical", "--mode", "single", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  icd11-lexical-set-draft:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "lexical", "--mode", "set", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  icd11-parent-single-draft:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "parent", "--mode", "single", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  icd11-parent-set-draft:
+    <<: *common
+    command: ["--dataset", "icd11", "--negative-mode", "parent", "--mode", "set", "--include-llm", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  icd11-reasoning-single-draft:
+    <<: *common
+    command: ["--dataset", "icd11", "--mode", "single", "--include-llm", "--enable-reasoning", "--n-populations", "3", "--n-samples", "30", "--draft"]
+
+  # real_irr.py, not synthetic_irr.py -- override the image's default entrypoint.
+  derm1:
+    <<: *common
+    entrypoint: ["python", "-m", "soft_irr.experiments.real_irr"]
+    command: ["--category-field", "both", "--include-llm", "--batch-size", "8"]
+
+  reflacx:
+    <<: *common
+    entrypoint: ["python", "-m", "soft_irr.experiments.real_irr"]
+    command: ["--dataset", "reflacx", "--include-llm"]
+
+  passion-diagnosis:
+    <<: *common
+    entrypoint: ["python", "-m", "soft_irr.experiments.real_irr"]
+    command: ["--dataset", "passion", "--category-field", "diagnosis", "--include-llm"]
+
+  passion-conditions:
+    <<: *common
+    entrypoint: ["python", "-m", "soft_irr.experiments.real_irr"]
+    command: ["--dataset", "passion", "--category-field", "conditions_PASSION", "--include-llm"]
+
+volumes:
+  hf-cache:

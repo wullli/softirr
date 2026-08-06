@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soft-irr"
+version = "0.1.0"
+description = "Soft inter-rater reliability metrics for medical NLP evaluation"
+authors = [
+    { name = "Pascal Wullschleger", email = "pascal.wullschleger@gmail.com" },
+]
+license = "MIT"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "litellm",
+    "tenacity",
+    "transformers",
+	"torch==2.6.*",
+    "nltk",
+    "pydantic",
+    "scikit-learn",
+    "meddra-graph @ file:./external/meddra_graph",
+    "tqdm",
+    "datasets",
+	"accelerate",
+    "rapidfuzz",
+    "Pillow",
+    "imagehash",
+    "mlxtend",
+    "openpyxl",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+# Vendored git submodule, not this project's code.
+extend-exclude = ["external"]
+
+[tool.ruff.lint.per-file-ignores]
+# silence_hf_logging() must run before transformers is imported, so these imports cannot move.
+"src/soft_irr/evaluation/distances/__init__.py" = ["E402"]
+# Notebooks legitimately import after their setup cells.
+"notebooks/*.ipynb" = ["E402"]

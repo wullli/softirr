@@ -1,0 +1,3 @@
+[submodule "external/meddra_graph"]
+	path = external/meddra_graph
+	url = git@github.com:wullli/meddra-graph.git
