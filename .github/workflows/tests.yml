@@ -31,8 +31,10 @@ jobs:
           pytest --cov=soft_irr --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-          fail_ci_if_error: false
+        if: ${{ secrets.CODECOV_TOKEN != '' }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          curl -fsSL https://uploader.codecov.io/latest/linux/codecov -o codecov
+          chmod +x codecov
+          ./codecov -f coverage.xml -t "${CODECOV_TOKEN}" || true
