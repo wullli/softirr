@@ -27,6 +27,9 @@ class _SoftAeAnnotationTask(AnnotationTask):
     def Ae_kappa(self, cA, cB) -> float:
         return self._chance_agreement_kappa
 
+    def kappa_pairwise(self, cA, cB) -> float:
+        return self._chance_corrected_agreement(self.Ao(cA, cB), self.Ae_kappa(cA, cB))
+
     def pi(self) -> float:
         return self._chance_corrected_agreement(self.avg_Ao(), self._chance_agreement_pi)
 
