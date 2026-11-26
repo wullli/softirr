@@ -34,6 +34,8 @@ _LAZY: dict[str, str] = {
     "BipartiteNLIDistance": "soft_irr.evaluation.distances.nli",
     "bipartite_nli_distance": "soft_irr.evaluation.distances.nli",
     "bipartite_nli_multilingual_distance": "soft_irr.evaluation.distances.nli",
+    "BipartiteS1Distance": "soft_irr.evaluation.distances.s1",
+    "bipartite_s1_pubmedbert_distance": "soft_irr.evaluation.distances.s1",
     "BipartiteEmbeddingDistance": "soft_irr.evaluation.distances.embedding",
     "BipartiteQwen3EmbeddingDistance": "soft_irr.evaluation.distances.embedding",
     "bipartite_embedding_distance": "soft_irr.evaluation.distances.embedding",
@@ -54,6 +56,7 @@ _LAZY: dict[str, str] = {
     "single_logprob_qwen35": "soft_irr.evaluation.distances.single_wrapper",
     "single_nli_mednli": "soft_irr.evaluation.distances.single_wrapper",
     "single_nli_multilingual": "soft_irr.evaluation.distances.single_wrapper",
+    "single_s1_pubmedbert": "soft_irr.evaluation.distances.single_wrapper",
     "single_verbalized_medgemma": "soft_irr.evaluation.distances.single_wrapper",
     "single_verbalized_qwen35": "soft_irr.evaluation.distances.single_wrapper",
 }
@@ -96,6 +99,8 @@ __all__ = [
     "BipartiteNLIDistance",
     "bipartite_nli_distance",
     "bipartite_nli_multilingual_distance",
+    "BipartiteS1Distance",
+    "bipartite_s1_pubmedbert_distance",
     "BipartiteEmbeddingDistance",
     "bipartite_embedding_distance",
     "BipartiteQwen3EmbeddingDistance",
@@ -118,4 +123,5 @@ __all__ = [
     "single_embedding_qwen3",
     "single_nli_mednli",
     "single_nli_multilingual",
+    "single_s1_pubmedbert",
 ]

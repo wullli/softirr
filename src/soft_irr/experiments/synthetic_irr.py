@@ -41,6 +41,7 @@ from soft_irr.evaluation.distances import (
     bipartite_nli_multilingual_distance,
     bipartite_normalized_indel_distance,
     bipartite_qwen3_embedding_distance,
+    bipartite_s1_pubmedbert_distance,
     exact_match_distance,
     jaccard_distance,
     lcsseq_distance,
@@ -52,6 +53,7 @@ from soft_irr.evaluation.distances import (
     single_embedding_qwen3,
     single_nli_mednli,
     single_nli_multilingual,
+    single_s1_pubmedbert,
 )
 from soft_irr.evaluation.distances.base import _as_matching_str_list
 from soft_irr.evaluation.distances.pair_cache import (
@@ -781,10 +783,12 @@ def _build_measures(
         "embedding_qwen3": bipartite_qwen3_embedding_distance,
         "nli_mednli": bipartite_nli_distance,
         "nli_mdeberta": bipartite_nli_multilingual_distance,
+        "s1_pubmedbert": bipartite_s1_pubmedbert_distance,
         "embedding_pubmedbert_single": single_embedding_pubmedbert,
         "embedding_qwen3_single": single_embedding_qwen3,
         "nli_mednli_single": single_nli_mednli,
         "nli_mdeberta_single": single_nli_multilingual,
+        "s1_pubmedbert_single": single_s1_pubmedbert,
     })
 
     if include_llm:

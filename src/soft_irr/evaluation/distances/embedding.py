@@ -19,11 +19,12 @@ class BipartiteEmbeddingDistance(BipartiteMatchingDistance):
 
     def _load(self) -> None:
         from transformers import pipeline as hf_pipeline
+        # max_length must go through tokenize_kwargs: the feature-extraction pipeline drops a top-level
+        # max_length, and this tokenizer sets no model_max_length, so truncation alone is a no-op.
         self._pipeline = hf_pipeline(
             "feature-extraction",
             model=self.model_name,
-            truncation=True,
-            max_length=128,
+            tokenize_kwargs={"truncation": True, "max_length": 128},
         )
 
     def _get_embeddings(self, texts: list[str], batch_size: int) -> Any:

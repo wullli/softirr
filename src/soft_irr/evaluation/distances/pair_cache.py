@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping
 CACHEABLE_MEASURES = frozenset({
     "nli_mednli",
     "nli_mdeberta",
+    "s1_pubmedbert",
     "logprob_qwen35",
     "logprob_medgemma",
     "verbalized_qwen35",

@@ -35,7 +35,6 @@ class BipartiteNLIDistance(BipartiteMatchingDistance):
         parsed: list[tuple[Any, Any, list[str], list[str]]],
         batch_size: int,
     ) -> None:
-        nli_inputs: list[dict[str, str]] = []
         input_keys: list[tuple[str, str]] = []
         queued: set[tuple[str, str]] = set()
 
@@ -51,26 +50,27 @@ class BipartiteNLIDistance(BipartiteMatchingDistance):
                         if key not in self._entailment_cache and key not in queued:
                             queued.add(key)
                             input_keys.append(key)
-                            nli_inputs.append({"text": premise, "text_pair": hypothesis})
 
-        self.last_n_prompts = len(nli_inputs)
-        if not nli_inputs:
+        self.last_n_prompts = len(input_keys)
+        if not input_keys:
             return
         if self._pipeline is None:
             self._load()
         if self._pipeline is None:
             raise ValueError("Failed to load NLI model pipeline.")
-        raw: list[Any] = []
-        for i in tqdm(
-            range(0, len(nli_inputs), batch_size), desc="  NLI inference", leave=False, unit="batch"
-        ):
-            chunk = nli_inputs[i : i + batch_size]
-            raw.extend(self._pipeline(chunk, batch_size=batch_size))
-        for key, result in zip(input_keys, raw):
-            entailment = next(
-                (r["score"] for r in result if r["label"].lower() == "entailment"), 0.0
-            )
+        for key, entailment in zip(input_keys, self._entailment_probs(input_keys, batch_size)):
             self._entailment_cache[key] = entailment
+
+    def _entailment_probs(self, keys: list[tuple[str, str]], batch_size: int) -> list[float]:
+        """P(premise entails hypothesis) for each (premise, hypothesis) key."""
+        raw: list[Any] = []
+        for i in tqdm(range(0, len(keys), batch_size), desc="  NLI inference", leave=False, unit="batch"):
+            chunk = [{"text": premise, "text_pair": hypothesis} for premise, hypothesis in keys[i : i + batch_size]]
+            raw.extend(self._pipeline(chunk, batch_size=batch_size))
+        return [
+            next((r["score"] for r in result if r["label"].lower() == "entailment"), 0.0)
+            for result in raw
+        ]
 
     def _cost(self, a: str, b: str) -> float:
         if self._string_distance_cache is not None:

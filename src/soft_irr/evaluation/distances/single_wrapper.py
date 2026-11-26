@@ -17,6 +17,7 @@ from soft_irr.evaluation.distances.nli import (
     bipartite_nli_distance,
     bipartite_nli_multilingual_distance,
 )
+from soft_irr.evaluation.distances.s1 import bipartite_s1_pubmedbert_distance
 
 
 class _SingleBipartiteWrapper(DistanceFunction):
@@ -61,3 +62,4 @@ single_embedding_pubmedbert = _SingleBipartiteWrapper(bipartite_embedding_distan
 single_embedding_qwen3 = _SingleBipartiteWrapper(bipartite_qwen3_embedding_distance)
 single_nli_mednli = _SingleBipartiteWrapper(bipartite_nli_distance)
 single_nli_multilingual = _SingleBipartiteWrapper(bipartite_nli_multilingual_distance)
+single_s1_pubmedbert = _SingleBipartiteWrapper(bipartite_s1_pubmedbert_distance)
