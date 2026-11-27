@@ -10,8 +10,6 @@ them.
 ## Requirements
 
 - Python >= 3.10
-- git (for the `meddra_graph` submodule, used by the MedDRA taxonomy loader)
-- Optional: an API key in `.env` (e.g. `OPENAI_API_KEY`) for the LLM-based distance measures
 
 ## Installation
 
