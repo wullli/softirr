@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 
 PAIRING_KEYS = ("dataset", "mode", "agreement_level", "seed")
+# Columns that split one measure into separately tested variants (set-mode matching strategy,
+# ablation arms). Present ones are tested per variant and reported next to "measure".
+ARM_KEYS = ("matching", "chance_measure", "reasoning")
 RESULT_COLUMNS = ["measure", "negative_mode", "n_pairs", "mean_delta", "p_value", "p_adjusted", "significant"]
 
 
@@ -34,16 +37,26 @@ def paired_deltas_vs_reference(
     n_perm: int = 10_000,
     seed: int = 0,
     keys: Sequence[str] = PAIRING_KEYS,
+    arm_keys: Sequence[str] = ARM_KEYS,
 ) -> pd.DataFrame:
-    if frame.empty:
-        return pd.DataFrame(columns=RESULT_COLUMNS)
+    """Sign-flip test of each negative mode against ``ref``, per measure (and per arm), Holm-corrected.
+
+    Rows are paired on ``keys``. Each combination of measure and the ``arm_keys`` columns present in
+    ``frame`` (e.g. hungarian vs. greedy matching) is tested separately; missing arm values count
+    as their own arm.
+    """
     keys = [k for k in keys if k in frame.columns]
-    if frame.duplicated([*keys, "measure", "negative_mode"]).any():
-        raise ValueError(f"duplicate rows for pairing keys {keys} + measure + negative_mode")
+    arms = [k for k in arm_keys if k in frame.columns and k not in keys]
+    columns = [RESULT_COLUMNS[0], *arms, *RESULT_COLUMNS[1:]]
+    if frame.empty:
+        return pd.DataFrame(columns=columns)
+    group_keys = ["measure", *arms]
+    if frame.duplicated([*keys, *group_keys, "negative_mode"]).any():
+        raise ValueError(f"duplicate rows for pairing keys {keys} + {group_keys} + negative_mode")
 
     rng = np.random.default_rng(seed)
     rows = []
-    for measure, msub in frame.groupby("measure"):
+    for group, msub in frame.groupby(group_keys, dropna=False, sort=True):
         wide = msub.pivot(index=keys, columns="negative_mode", values=metric)
         if ref not in wide.columns:
             continue
@@ -53,14 +66,14 @@ def paired_deltas_vs_reference(
                 continue
             diff = (pair[neg_mode] - pair[ref]).to_numpy()
             rows.append({
-                "measure": measure,
+                **dict(zip(group_keys, group)),
                 "negative_mode": neg_mode,
                 "n_pairs": len(diff),
                 "mean_delta": diff.mean(),
                 "p_value": sign_flip_pvalue(diff, n_perm, rng),
             })
 
-    table = pd.DataFrame(rows, columns=RESULT_COLUMNS[:5])
+    table = pd.DataFrame(rows, columns=columns[:-2])
     table["p_adjusted"] = holm(table["p_value"])
     table["significant"] = table["p_adjusted"] < alpha
     return table

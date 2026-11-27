@@ -97,6 +97,34 @@ def test_paired_deltas_rejects_duplicate_pairing_keys():
         paired_deltas_vs_reference(pd.concat([frame, frame.iloc[:1]]))
 
 
+def test_paired_deltas_tests_each_matching_separately():
+    hungarian = _frame().assign(matching="hungarian")
+    greedy = _frame(shift=0.0).assign(matching="greedy")
+    table = paired_deltas_vs_reference(pd.concat([hungarian, greedy], ignore_index=True), n_perm=2_000)
+    assert list(table.columns) == [
+        "measure", "matching", "negative_mode", "n_pairs", "mean_delta", "p_value", "p_adjusted", "significant"
+    ]
+    assert len(table) == 4
+    assert (table["n_pairs"] == 12).all()
+    flagged = set(zip(table.loc[table["significant"], "measure"], table.loc[table["significant"], "matching"]))
+    assert flagged == {("a", "hungarian")}
+
+
+def test_paired_deltas_keeps_rows_with_missing_arm_values():
+    single = _frame().assign(matching=np.nan, reasoning=False)
+    table = paired_deltas_vs_reference(single, n_perm=2_000)
+    assert len(table) == 2
+    assert table["matching"].isna().all()
+    flagged = set(zip(table.loc[table["significant"], "measure"], table.loc[table["significant"], "negative_mode"]))
+    assert flagged == {("a", "sibling")}
+
+
+def test_paired_deltas_constant_arm_matches_no_arm_p_values():
+    plain = paired_deltas_vs_reference(_frame(), n_perm=500, seed=3)
+    with_arm = paired_deltas_vs_reference(_frame().assign(matching="hungarian"), n_perm=500, seed=3)
+    pd.testing.assert_frame_equal(plain, with_arm.drop(columns="matching"))
+
+
 def test_paired_deltas_skips_contrasts_with_fewer_than_two_pairs():
     table = paired_deltas_vs_reference(_frame(n_seeds=1), n_perm=200)
     assert table.empty
