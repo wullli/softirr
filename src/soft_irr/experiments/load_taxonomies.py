@@ -168,6 +168,35 @@ def load_mesh(path: str | Path) -> dict[str, ConceptEntry]:
     return concepts
 
 
+NCIT_CLINICAL_SEMANTIC_TYPES = frozenset({
+    "Disease or Syndrome", "Neoplastic Process", "Sign or Symptom", "Finding", "Pathologic Function",
+    "Mental or Behavioral Dysfunction", "Congenital Abnormality", "Injury or Poisoning",
+    "Anatomical Abnormality", "Acquired Abnormality",
+})
+
+
+def load_ncit(path: str | Path, semantic_types: set[str] | frozenset[str] | None = None) -> dict[str, ConceptEntry]:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    data.pop("_hierarchy", None)
+    return {
+        code: ConceptEntry(
+            code=code,
+            preferred_term=f"{entry['name']} ({code})",
+            synonyms=[d["text"] for d in entry["definitions"]],
+            parent_codes=list(entry["parents"]),
+            hierarchy_key=[code],
+        )
+        for code, entry in data.items()
+        if semantic_types is None or set(entry["semantic_types"]) & set(semantic_types)
+    }
+
+
+def load_ncit_ancestor_hierarchy(path: str | Path) -> dict[str, list[str]]:
+    with open(path, encoding="utf-8") as f:
+        return json.load(f).get("_hierarchy", {})
+
+
 def build_sibling_index(concepts: dict[str, ConceptEntry]) -> dict[str, list[str]]:
     parent_to_codes: dict[str, list[str]] = defaultdict(list)
     for code, entry in concepts.items():
@@ -308,12 +337,16 @@ def build_hierarchy_index(
     return hierarchy_index
 
 
+def lexical_name(entry: ConceptEntry) -> str:
+    return entry.preferred_term.removesuffix(f" ({entry.code})")
+
+
 def build_lexical_index(
     concepts: dict[str, ConceptEntry], top_k: int = 10, candidate_pool_size: int | None = None,
 ) -> dict[str, list[ConceptEntry]]:
     candidate_pool_size = candidate_pool_size or max(top_k * 5, 50)
     codes = list(concepts.keys())
-    terms = [concepts[c].preferred_term for c in codes]
+    terms = [lexical_name(concepts[c]) for c in codes]
     n = len(codes)
     chunk_size = 500
 
@@ -335,12 +368,12 @@ def build_lexical_index(
         if not cand_codes:
             lexical_index[code] = []
             continue
-        forms_a = [concepts[code].preferred_term, *concepts[code].synonyms]
+        forms_a = [lexical_name(concepts[code]), *concepts[code].synonyms]
         cand_forms: list[str] = []
         boundaries = [0]
         for cand_code in cand_codes:
             cand = concepts[cand_code]
-            cand_forms.extend([cand.preferred_term, *cand.synonyms])
+            cand_forms.extend([lexical_name(cand), *cand.synonyms])
             boundaries.append(len(cand_forms))
         sims = process.cdist(forms_a, cand_forms, scorer=Indel.normalized_similarity, workers=-1)
         mean_over_a = sims.mean(axis=0)

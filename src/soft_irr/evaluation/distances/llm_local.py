@@ -21,6 +21,7 @@ class _BipartiteLocalLLMBase(DirectionalEntailmentCache, BipartiteMatchingDistan
     _loaded_models: dict[tuple[str, bool], tuple[Any, Any]] = {}
 
     _PROMPT_MAX_LENGTH = 1024
+    _CHECKPOINT_PROMPTS = 2048
 
     def __init__(
         self,
@@ -106,9 +107,15 @@ class _BipartiteLocalLLMBase(DirectionalEntailmentCache, BipartiteMatchingDistan
             return
         if self._tokenizer is None or self._model is None:
             self._load()
-        prompts = [self._build_prompt(x, y) for x, y in unique_pairs]
-        for key, result in zip(unique_pairs, self._infer(prompts, batch_size)):
-            self._store_cost(key, result)
+        progress = tqdm(total=len(unique_pairs), desc="  prompts", leave=False, unit="prompt")
+        for start in range(0, len(unique_pairs), self._CHECKPOINT_PROMPTS):
+            block = unique_pairs[start : start + self._CHECKPOINT_PROMPTS]
+            prompts = [self._build_prompt(x, y) for x, y in block]
+            for key, result in zip(block, self._infer(prompts, batch_size)):
+                self._store_cost(key, result)
+            self._checkpoint_costs(block)
+            progress.update(len(block))
+        progress.close()
 
 
 class BipartiteLocalLogProbDistance(_BipartiteLocalLLMBase):

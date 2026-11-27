@@ -79,7 +79,15 @@ services:
     <<: *common
     command: ["--dataset", "meddra", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
 
-  # Negative-pair ablations, ICD-11 only. No 'children' service: ICD-11's pool is single-depth,
+  ncit-single:
+    <<: *common
+    command: ["--dataset", "ncit", "--mode", "single", "--include-llm", "--mc-min-shuffles", "3"]
+
+  ncit-set:
+    <<: *common
+    command: ["--dataset", "ncit", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
+
+  # Negative-pair ablations, ICD-11 and NCIt. No 'children' service: ICD-11's pool is single-depth,
   # so that mode always draws from an empty pool.
   icd11-sibling-single:
     <<: *common
@@ -104,6 +112,30 @@ services:
   icd11-parent-set:
     <<: *common
     command: ["--dataset", "icd11", "--negative-mode", "parent", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
+
+  ncit-sibling-single:
+    <<: *common
+    command: ["--dataset", "ncit", "--negative-mode", "sibling", "--mode", "single", "--include-llm", "--mc-min-shuffles", "3"]
+
+  ncit-sibling-set:
+    <<: *common
+    command: ["--dataset", "ncit", "--negative-mode", "sibling", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
+
+  ncit-lexical-single:
+    <<: *common
+    command: ["--dataset", "ncit", "--negative-mode", "lexical", "--mode", "single", "--include-llm", "--mc-min-shuffles", "3"]
+
+  ncit-lexical-set:
+    <<: *common
+    command: ["--dataset", "ncit", "--negative-mode", "lexical", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
+
+  ncit-parent-single:
+    <<: *common
+    command: ["--dataset", "ncit", "--negative-mode", "parent", "--mode", "single", "--include-llm", "--mc-min-shuffles", "3"]
+
+  ncit-parent-set:
+    <<: *common
+    command: ["--dataset", "ncit", "--negative-mode", "parent", "--mode", "set", "--include-llm", "--n-populations", "15", "--mc-min-shuffles", "2", "--mc-target-samples", "200"]
 
   # Ablation arms, ICD-11 single mode only (set mode is too expensive for extra arms). Each writes
   # its own suffixed files. chance-edit computes the chance term with an edit distance while the

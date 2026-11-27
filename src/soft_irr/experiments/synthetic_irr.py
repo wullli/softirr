@@ -7,6 +7,7 @@ import gzip
 import json
 import math
 import random
+import re
 import timeit
 from collections import defaultdict
 from pathlib import Path
@@ -18,6 +19,7 @@ from tqdm import tqdm
 
 from soft_irr.common import load_dotenv
 from soft_irr.experiments.load_taxonomies import (
+    NCIT_CLINICAL_SEMANTIC_TYPES,
     ConceptEntry,
     build_hierarchy_index,
     build_lexical_index,
@@ -29,6 +31,8 @@ from soft_irr.experiments.load_taxonomies import (
     load_meddra_ancestor_hierarchy,
     load_meddra_ancestor_names,
     load_mesh,
+    load_ncit,
+    load_ncit_ancestor_hierarchy,
 )
 from soft_irr.evaluation.distances import (
     BipartiteMatchingDistance,
@@ -272,7 +276,23 @@ def output_suffix(args: argparse.Namespace, mode: str) -> str:
     suffix += "_draft" if args.draft and not args.chance_measure else (
         f"_chance-{args.chance_measure}" if args.chance_measure else ""
     )
-    return suffix + ("_reasoning" if args.enable_reasoning else "")
+    suffix += "_reasoning" if args.enable_reasoning else ""
+    return suffix + ncit_semantic_suffix(getattr(args, "ncit_semantic_types", None))
+
+
+def ncit_semantic_suffix(semantic_types: list[str] | None) -> str:
+    if not semantic_types:
+        return ""
+    return "_sty-" + "-".join(re.sub(r"[^a-z0-9]+", "", t.lower()) for t in semantic_types)
+
+
+def resolve_ncit_semantic_types(semantic_types: list[str] | None) -> set[str] | None:
+    if not semantic_types:
+        return None
+    resolved: set[str] = set()
+    for t in semantic_types:
+        resolved |= set(NCIT_CLINICAL_SEMANTIC_TYPES) if t == "clinical" else {t}
+    return resolved
 
 
 def chance_settings(args: argparse.Namespace) -> tuple[str | None, int | None]:
@@ -821,7 +841,16 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Synthetic IRR experiments with controlled agreement levels."
     )
-    p.add_argument("--dataset", required=True, choices=["icd11", "meddra", "mesh"])
+    p.add_argument("--dataset", required=True, choices=["icd11", "meddra", "mesh", "ncit"])
+    p.add_argument(
+        "--ncit-semantic-types",
+        nargs="+",
+        default=None,
+        help=(
+            "(NCIt only) Keep concepts with at least one of these semantic types. "
+            "'clinical' expands to the clinical disorder and finding types. Default: all."
+        ),
+    )
     p.add_argument(
         "--icd11-synonyms",
         default=str(_ROOT_DIR / "data/icd11/synonyms.json"),
@@ -955,6 +984,7 @@ _DATA_PATH_DEFAULTS = {
     "icd11": str(_ROOT_DIR / "data/icd11/LinearizationMiniOutput-MMS-en.txt"),
     "meddra": str(_ROOT_DIR / "data/meddra/"),
     "mesh": str(_ROOT_DIR / "data/mesh/desc2026.xml"),
+    "ncit": str(_ROOT_DIR / "data/ncit/definitions.json"),
 }
 
 
@@ -974,6 +1004,8 @@ def main() -> None:
             return
     elif args.dataset == "meddra":
         concepts = load_meddra(data_path)
+    elif args.dataset == "ncit":
+        concepts = load_ncit(data_path, resolve_ncit_semantic_types(args.ncit_semantic_types))
     else:
         concepts = load_mesh(data_path)
 
@@ -994,6 +1026,9 @@ def main() -> None:
         elif args.dataset == "icd11":
             parent_terms = load_icd11_ancestor_titles(data_path)
             ancestor_parent_codes = load_icd11_ancestor_hierarchy(data_path)
+        elif args.dataset == "ncit":
+            parent_terms = {}
+            ancestor_parent_codes = load_ncit_ancestor_hierarchy(data_path)
 
     measures = _build_measures(
         args.include_llm, args.simple_only, args.enable_reasoning, args.llm_fp16
