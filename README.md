@@ -14,8 +14,8 @@ them.
 ## Installation
 
 ```bash
-git clone --recurse-submodules <repo-url>
-cd soft-irr
+git clone --recurse-submodules https://github.com/wullli/softirr.git
+cd softirr
 pip install -e ".[dev]"
 ```
 
