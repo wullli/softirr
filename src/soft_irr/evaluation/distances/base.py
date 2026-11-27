@@ -4,6 +4,8 @@ import math
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Hashable
 
+from soft_irr.evaluation.distances.pair_cache import canonical
+
 _MATCHING_ORDER_KEY = b"soft-irr-label-order"
 
 
@@ -166,7 +168,9 @@ class DirectionalEntailmentCache:
     _BOTH_DIRECTIONS = True
     is_pair_cacheable = True
     _string_distance_cache: dict[tuple[str, str], float] | None
+    _pair_cache: dict[tuple[str, str], float] | None
     _is_cached: Callable[[str, str], bool]
+    _cost: Callable[[str, str], float]
 
     def _init_cost_cache(self) -> None:
         self._infer_cost_cache: dict[tuple[str, str], float] = {}
@@ -189,6 +193,24 @@ class DirectionalEntailmentCache:
                             seen.add(key)
                             keys.append(key)
         return keys
+
+    def _checkpoint_costs(self, keys: list[tuple[str, str]]) -> None:
+        sink = getattr(self, "_pair_cost_sink", None)
+        if sink is None:
+            return
+        fresh: dict[tuple[str, str], float] = {}
+        for x, y in keys:
+            pair = canonical(x, y)
+            if pair in fresh or self._is_cached(*pair):
+                continue
+            if (x, y) in self._infer_cost_cache and (y, x) in self._infer_cost_cache:
+                fresh[pair] = self._cost(*pair)
+        if not fresh:
+            return
+        sink(fresh)
+        if self._pair_cache is None:
+            self._pair_cache = {}
+        self._pair_cache.update(fresh)
 
     def _store_cost(self, key: tuple[str, str], result: Any) -> None:
         if self._BOTH_DIRECTIONS:

@@ -4,6 +4,8 @@ from __future__ import annotations
 import csv
 import gzip
 import json
+import os
+import zlib
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -27,7 +29,7 @@ def base_measure(name: str) -> str:
     return name.removesuffix("_single")
 
 
-_TORN = (EOFError, OSError, ValueError, KeyError, TypeError)
+_TORN = (EOFError, OSError, ValueError, KeyError, TypeError, zlib.error)
 
 
 class PairCostWriter:
@@ -37,6 +39,7 @@ class PairCostWriter:
         self._fh = None
         if self.path is not None:
             self.path.parent.mkdir(parents=True, exist_ok=True)
+            _drop_torn_tail(self.path)
             self._fh = gzip.open(self.path, "at")
         self.n_written = 0
 
@@ -48,6 +51,7 @@ class PairCostWriter:
                 {"measure": measure, "reasoning": reasoning, "x": x, "y": y, "cost": round(float(cost), 6)},
                 ensure_ascii=False,
             ) + "\n")
+        self._fh.flush()
         self.n_written += len(items)
 
     def close(self) -> None:
@@ -60,6 +64,28 @@ class PairCostWriter:
 
     def __exit__(self, *exc: Any) -> None:
         self.close()
+
+
+def _drop_torn_tail(path: Path) -> None:
+    if not path.exists() or path.stat().st_size == 0:
+        return
+    tmp = path.with_name(path.name + ".repair")
+    torn = False
+    with gzip.open(tmp, "wt") as out, gzip.open(path, "rt") as f:
+        while True:
+            try:
+                line = next(f)
+                json.loads(line)
+            except StopIteration:
+                break
+            except _TORN:
+                torn = True
+                break
+            out.write(line)
+    if torn:
+        os.replace(tmp, path)
+    else:
+        tmp.unlink()
 
 
 def attach_writer(measures: Mapping[str, Any], writer: PairCostWriter) -> int:
